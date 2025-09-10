@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FullStackAuth.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+578c67d5bfa6d699c514d463734d0b67be3ec12b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ee9bb97903febeb393b5be2001193292ad924918")]
 [assembly: System.Reflection.AssemblyProductAttribute("FullStackAuth.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FullStackAuth.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
