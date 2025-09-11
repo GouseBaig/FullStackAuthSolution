@@ -1,3 +1,4 @@
+using FullStackAuth.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -8,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddSingleton<IUserService, InMemoryUserService>();
+
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -21,8 +25,9 @@ builder.Services.AddCors(options =>
 });
 
 // JWT Configuration
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = "b7f8e3c9a1d4f6e2b5c7a9e8f2d3c4b6";
+
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "b7f8e3c9a1d4f6e2b5c7a9e8f2d3c4b6";
+var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -39,7 +44,7 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = "FullStackAuth.API",
         ValidAudience = "FullStackAuth.Web",
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
     };
 });
 

@@ -1,79 +1,76 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using FullStackAuth.API.Models;
+using FullStackAuth.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FullStackAuth.API.Controllers
 {
+    [Route("api/[controller]")]
     [ApiController]
-    [Route("[controller]")]
     public class AuthController : ControllerBase
     {
-        // In-memory user storage (as requested in assignment)
-        private readonly Dictionary<string, string> _users = new()
-        {
-            { "test", "1234" }
-        };
+        private readonly IConfiguration _config;
+        private readonly IUserService _userService;
 
-        private readonly string _secretKey = "b7f8e3c9a1d4f6e2b5c7a9e8f2d3c4b6";
+        public AuthController(IConfiguration config, IUserService userService)
+        {
+            _config = config;
+            _userService = userService;
+        }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest request)
+        public IActionResult Login([FromBody] LoginRequest req)
         {
-            // Validate credentials
-            if (_users.TryGetValue(request.Username, out var storedPassword) &&
-                storedPassword == request.Password)
-            {
-                var token = GenerateJwtToken(request.Username);
-                return Ok(new { token });
-            }
+            if (req == null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+                return BadRequest(new { error = "Username and password are required" });
 
-            return Unauthorized(new { error = "Invalid username or password" });
-        }
+            var user = _userService.ValidateUser(req.Username, req.Password);
+            if (user == null)
+                return Unauthorized(new { error = "Invalid username or password" });
 
-        [HttpGet("profile")]
-        [Authorize]
-        public IActionResult GetProfile()
-        {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-
-            return Ok(new
-            {
-                id = 1,
-                username = username,
-                role = "admin"
-            });
-        }
-
-        private string GenerateJwtToken(string username)
-        {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_secretKey);
+            var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"] ?? string.Empty);
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Username!),
+                new Claim(ClaimTypes.Role, user.Role!),
+                new Claim("id", user.Id.ToString())
+            };
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.Name, username),
-                    new Claim(ClaimTypes.Role, "admin")
-                }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                Issuer = "FullStackAuth.API",
-                Audience = "FullStackAuth.Web",
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),
-                    SecurityAlgorithms.HmacSha256Signature)
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(double.Parse(_config["Jwt:ExpireMinutes"] ?? "60")),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
+                Issuer = _config["Jwt:Issuer"],
+                Audience = _config["Jwt:Audience"]
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
-        }
-    }
+            var tokenString = tokenHandler.WriteToken(token);
 
-    public class LoginRequest
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
+            return Ok(new { token = tokenString });
+        }
+
+        [Authorize]
+        [HttpGet("profile")]
+        public IActionResult Profile()
+        {
+            var username = User.Identity?.Name;
+            if (string.IsNullOrEmpty(username))
+                return Unauthorized(new { error = "Invalid token" });
+
+            var idClaim = User.Claims.FirstOrDefault(c => c.Type == "id")?.Value;
+            var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+
+            if (!int.TryParse(idClaim, out int id)) id = 0;
+
+            return Ok(new { id, username, role });
+        }
     }
 }

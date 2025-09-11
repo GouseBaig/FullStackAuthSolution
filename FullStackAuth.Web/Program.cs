@@ -1,15 +1,21 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add MVC controllers + Razor views
 builder.Services.AddControllersWithViews();
 
-// Add HttpClient for API calls
-builder.Services.AddHttpClient("AuthAPI", client =>
+// Configure HttpClient for API calls using BaseUrl from appsettings.json
+var apiBaseUrl = builder.Configuration.GetValue<string>("ApiBaseUrl");
+if (string.IsNullOrEmpty(apiBaseUrl))
 {
-    client.BaseAddress = new Uri("http://localhost:7000/"); // API URL
+    throw new InvalidOperationException("API base URL is not configured. Please check appsettings.json.");
+}
+
+builder.Services.AddHttpClient("Api", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
 });
 
-// Add session support
+// Enable Session (in-memory store)
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -20,7 +26,7 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure middleware pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -31,9 +37,11 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
 app.UseSession();
 app.UseAuthorization();
 
+// Default route
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
